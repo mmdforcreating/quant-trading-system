@@ -45,5 +45,8 @@ Users/
 catboost_info/
 mlruns/
 
-# qlib 为独立仓库，另一台设备可单独克隆到 Quant/qlib
-qlib/
+# qlib 和 backtrader 已包含在仓库中（含本地修改），不再排除
+# 但排除它们内部的 .git 目录
+qlib/.git/
+backtrader/.git/
+.venv
