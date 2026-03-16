@@ -1,11 +1,29 @@
-# 量化系统运行依赖（Python 3.8+）
-pandas>=1.3
-numpy>=1.20
-scipy>=1.7
-PyYAML>=5.4
+# 量化系统完整依赖（Python 3.9+）
+# 在 Windows 上: pip install -r requirements.txt
+
+# 核心数据处理
+pandas>=2.0
+numpy>=1.24
+scipy>=1.10
+PyYAML>=6.0
 tqdm
-scikit-learn>=0.24
-catboost
-lightgbm
-torch>=1.10
-pyarrow
+pyarrow>=12.0
+
+# 机器学习
+scikit-learn>=1.3
+catboost>=1.2
+lightgbm>=4.0
+
+# 深度学习（GRU 模型）
+torch>=2.0
+
+# 回测框架
+backtrader>=1.9.78
+
+# 数据源
+tushare>=1.4
+akshare>=1.10
+
+# Qlib（因子引擎，需单独安装）
+# pip install pyqlib
+# 或从源码: git clone https://github.com/microsoft/qlib.git && pip install -e qlib/
