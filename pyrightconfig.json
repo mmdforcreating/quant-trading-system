@@ -1,0 +1,9 @@
+{
+    "executionEnvironments": [
+        {
+            "root": "my_strategies",
+            "extraPaths": ["/Users/mengmingdong/Quant/qlib"],
+            "pythonVersion": "3.9"
+        }
+    ]
+}

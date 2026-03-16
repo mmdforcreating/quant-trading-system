@@ -1,0 +1,42 @@
+# 虚拟环境与解释器
+.venv/
+venv/
+env/
+.env/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# 数据与产出（体积大、可本地重新生成）
+my_strategies/data/
+my_strategies/output/
+data/
+output/
+*.parquet
+*.bin
+panel.parquet
+mlruns/
+catboost_info/
+
+# 配置与密钥（另一台设备需自配）
+.env
+*.key
+.env.local
+
+# IDE / 系统
+.idea/
+.vscode/
+.DS_Store
+*.swp
+.cursor/
+
+# qlib 为独立仓库，另一台设备可单独克隆到 Quant/qlib
+qlib/

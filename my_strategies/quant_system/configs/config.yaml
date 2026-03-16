@@ -1,0 +1,225 @@
+# ============================================================
+#  多因子量化选股系统 - 全局配置 (集成升级版)
+# ============================================================
+
+strategy_name: "alpha_multifactor_v2"
+
+# ---- Qlib 初始化 ----
+qlib_init:
+  provider_uri: "~/.qlib/qlib_data/cn_data"
+  region: cn
+
+# ---- 数据管道 ----
+data_pipeline:
+  source: tushare
+  tushare_token: "656dba920647f3ff20cf261e6b7dd264ffd8441e52679d68d9d014a0"  # 本地用；若推送到远程建议改环境变量 TUSHARE_TOKEN
+  start_date: "20220104"   # 2022 年第一个交易日
+  end_date: null                     # null = 今天
+  csv_storage: "~/.qlib/csv_data"
+  qlib_dir: "~/.qlib/qlib_data/cn_data"
+  panel_path: "data/panel.parquet"
+  raw_data_dir: "data/raw"
+
+  stock_pool:
+    source: "tushare_top"            # 按 A 股流通市值从高到低取 Top N
+    size: 500
+    exclude_bj: true
+    exclude_cyb: true
+    exclude_kcb: true
+
+  fetch:
+    sleep_s: 0.3
+    max_retry: 5
+    backoff_base: 2
+    batch_by_trade_date: false   # false=按股票拉(ts_code+起止日)，请求少、速度稳；true=按日拉(trade_date)，请求多易卡
+
+  # 分钟级数据（仅 akshare，TuShare 无分钟线）
+  # 当前使用外部购买的分钟数据，不在此拉取；需拉取时改 enable 为 true
+  minute:
+    enable: false
+    periods: ["5"]           # 5 分钟可回填；1 分钟仅最近几天
+    storage_path: "data/minute"
+    sleep_sec: 0.5
+    recent_days: 10         # 只拉最近 N 天（省时）；设为 null 或删掉则拉全区间
+    use_fallback: true     # 主源(东方财富)整只失败时用新浪兜底
+
+# ---- 因子引擎 ----
+factor_engine:
+  use_alpha158: true                 # Qlib Alpha158 作为基座因子
+  use_custom: true                   # 自研因子（资金流/估值/质量/裂变/量价）
+  label_horizon: 5                   # 预测未来 N 日收益
+  label_col: "y_ret_5d_adj"
+
+  cross_sectional:
+    enable: true
+    winsor_q: 0.01
+    enable_neutralize: true
+
+  selection:
+    method: "greedy"                 # greedy / ic_vif
+    min_keep: 5
+    max_keep: 80
+    min_abs_icir: 0.02
+    max_vif: 100.0
+    corr_threshold: 0.95
+    min_coverage: 0.45
+
+# ---- 激活模型列表 ----
+active_models:
+  - catboost
+  - lgbm
+  - lambdarank
+  - ridge
+  - gru
+
+# ---- 各模型参数 ----
+models:
+  catboost:
+    class: CatBoostQuantModel
+    module_path: quant_system.models.catboost_model
+    kwargs:
+      iterations: 600
+      learning_rate: 0.05
+      depth: 6
+      loss_function: "RMSE"
+      verbose: 0
+      early_stopping_rounds: 20
+
+  lgbm:
+    class: LightGBMQuantModel
+    module_path: quant_system.models.lgbm_model
+    kwargs:
+      n_estimators: 400
+      learning_rate: 0.03
+      num_leaves: 31
+      subsample: 0.9
+      colsample_bytree: 0.9
+      min_child_samples: 50
+
+  lambdarank:
+    class: LambdaRankQuantModel
+    module_path: quant_system.models.lgbm_model
+    kwargs:
+      n_estimators: 400
+      learning_rate: 0.03
+      num_leaves: 31
+
+  ridge:
+    class: RidgeQuantModel
+    module_path: quant_system.models.ridge_model
+    kwargs:
+      alpha: 2.0
+
+  gru:
+    class: GRUQuantModel
+    module_path: quant_system.models.gru_wf_adapter
+    kwargs:
+      minute_data_path: "data/minute"
+      minute_period: "1"
+      lookback_days: 2
+      hidden_size: 64
+      num_layers: 2
+      dropout: 0.1
+      lr: 0.001
+      batch_size: 64
+      max_epochs: 30
+      patience: 5
+      min_train_samples: 10
+      force_cpu: false
+
+# ---- Walk-Forward 训练 ----
+walk_forward:
+  step_days: 5                       # 周频滚动步长
+  train_window_days: 360             # 训练窗口（约 1.5 年）
+  min_train_rows: 300
+  execution_lag: 1                   # T+1 执行
+  top_k: 5                           # 每期选股数
+  hold_days: 5                       # 持仓天数
+  purge_days: 2                      # Purging gap：训练集末尾截断天数，防止标签泄漏
+  risk_parity: false                 # true=反ATR加权（风险平价），false=等权
+  # RollingTrainer 兼容键名
+  step: 5
+  train_window: 252
+  valid_window: 63
+
+# ---- 换手控制 ----
+turnover_control:
+  enabled: true
+  buffer_mult: 2                     # 候选缓冲池 = buffer_mult * top_k
+  min_hold_days_before_replace: 2    # 未满此天数不替换（除非触发止损/止盈）
+  replace_score_delta: 0.0           # 新标的分数需超旧标的此值才替换
+  max_turnover_names_per_day: null   # null=不限；设 3 则每日最多换 3 只
+
+# ---- 模型评分 ----
+scoring:
+  weights:
+    sharpe_val: 0.40
+    cum_return_val: 0.15
+    max_drawdown_val: 0.15             # 正值：max_dd 为负数，Z-Score 后回撤小→高分，需正权奖励
+    turnover: -0.10                    # 负值：换手率高→惩罚
+    cost_robust: 0.10                  # 正值：val_sharpe/train_sharpe 越大越抗成本→奖励
+    overfit_gap: -0.10                 # 负值：train_sharpe - val_sharpe 越大越过拟合→惩罚
+  oos_rank_ic_days: 60
+  weight_cap: 0.40
+
+# ---- 集成预测 ----
+ensemble:
+  method: "rank_ic_weighted"         # rank_ic_weighted / average
+  weight_scheme: "softmax"           # softmax / rank_decay
+  per_model_topn: 10
+  final_topn: 5
+
+# ---- 胜率调整 ----
+winrate:
+  enable: true
+  beta: 1.0
+  min_samples: 20
+  min_multiplier: 0.75
+  max_multiplier: 1.25
+  lookback_days: 90
+  cost_threshold: 0.002
+
+# ---- 风控 ----
+risk:
+  initial_capital: 1000000.0
+  max_position_per_name: 0.50
+  max_gross_exposure: 1.0
+  target_gross_exposure: 0.85
+  max_drawdown_stop: 0.08
+  cooldown_days: 3
+  risk_pct_per_trade: 0.01
+
+  atr:
+    enabled: true
+    window: 14
+    k_stop: 1.5                      # 止损 = entry - k_stop * ATR
+    k_trail: 1.0                     # 追踪宽度
+    k_trail_start: 2.0               # 盈利超此倍数 ATR 后启动追踪
+    min_stop_pct: 0.03
+    max_stop_pct: 0.12
+
+# ---- 交易成本 ----
+costs:
+  commission_bps: 2
+  slippage_bps: 5
+  stamp_tax_bps: 5                   # 卖出印花税
+
+# ---- 输出 ----
+output:
+  dir: "output"
+  saved_models_dir: "output/saved_models"
+  cache_dir: "output/cache"
+  reports_dir: "output/reports"
+
+# ---- Backtrader ----
+# 信号来源：predictions_{model}.csv 或 ensemble_predictions.csv
+# 交易计划：trade_plan.csv (ts_code, action, suggested_price, stop_loss, take_profit, position_size)
+backtrader:
+  enabled: true
+  data_dir: "data/backtrader"
+  initial_capital: 1000000.0
+  commission_pct: 0.0007              # 综合佣金费率（买/卖各收）
+  stamp_tax_pct: 0.0005               # 卖出印花税
+  slippage_pct: 0.001                 # 滑点
+  plot: false                         # 是否绘图
+  report_dir: "output/backtest_reports"
