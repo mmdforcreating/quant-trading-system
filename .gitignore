@@ -38,5 +38,12 @@ catboost_info/
 *.swp
 .cursor/
 
+# 非核心目录
+akshare_demo/
+Users/
+运行结果/
+catboost_info/
+mlruns/
+
 # qlib 为独立仓库，另一台设备可单独克隆到 Quant/qlib
 qlib/
