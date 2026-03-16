@@ -70,16 +70,13 @@ pip install -r my_strategies/requirements.txt
 > pip install torch --index-url https://download.pytorch.org/whl/cu121
 > ```
 
-### 第 5 步：安装 Qlib（可选，用于 Alpha158 因子）
+### 第 5 步：安装仓库内的 qlib 和 backtrader
+
+qlib（含本地修改）和 backtrader 已经在仓库里，用开发模式安装即可：
 
 ```bash
-pip install pyqlib
-```
-
-或从源码安装（更灵活）：
-```bash
-git clone https://github.com/microsoft/qlib.git qlib
 pip install -e qlib/
+pip install -e backtrader/
 ```
 
 ### 第 6 步：准备数据
